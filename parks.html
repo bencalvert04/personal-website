@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>National Parks Explorer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --forest: #1a3a2a;
+            --forest-light: #2d5a3d;
+            --sage: #6b9e74;
+            --sage-light: #a8c5aa;
+            --cream: #f8f6f1;
+            --tan: #e5d9c5;
+            --tan-light: #f0e9db;
+            --text-dark: #111;
+            --text-mid: #555;
+            --text-light: #999;
+            --visited: #1f7a3d;
+            --wishlist: #b87309;
+            --shadow-sm: 0 1px 4px rgba(0,0,0,0.07);
+            --shadow-md: 0 4px 18px rgba(0,0,0,0.09);
+            --shadow-lg: 0 12px 40px rgba(0,0,0,0.14);
+            --radius: 10px;
+            --radius-lg: 18px;
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--cream);
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        /* ── HEADER ── */
+        .header {
+            background: var(--forest);
+            color: white;
+            padding: 64px 40px 52px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.12), transparent);
+        }
+
+        /* subtle mountain silhouette */
+        .header-mountains {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 80px;
+            opacity: 0.06;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 80' preserveAspectRatio='none'%3E%3Cpolygon fill='white' points='0,80 100,30 200,55 320,10 440,45 560,5 680,40 800,15 920,50 1040,20 1160,45 1200,30 1200,80'/%3E%3C/svg%3E") center/cover no-repeat;
+        }
+
+        .header-content { position: relative; z-index: 1; max-width: 660px; margin: 0 auto; }
+
+        .header-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.55);
+            margin-bottom: 22px;
+        }
+
+        .header-eyebrow::before, .header-eyebrow::after {
+            content: '';
+            display: block;
+            width: 32px;
+            height: 1px;
+            background: rgba(255,255,255,0.25);
+        }
+
+        .header h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(38px, 5.5vw, 60px);
+            font-weight: 700;
+            letter-spacing: -1px;
+            line-height: 1.08;
+            margin-bottom: 18px;
+        }
+
+        .header-sub {
+            font-size: 15px;
+            color: rgba(255,255,255,0.55);
+            font-weight: 400;
+            max-width: 420px;
+            margin: 0 auto 40px;
+            line-height: 1.7;
+        }
+
+        /* Stats */
+        .stats-row {
+            display: inline-flex;
+            gap: 2px;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 14px;
+            overflow: hidden;
+            padding: 0;
+        }
+
+        .stat {
+            padding: 18px 30px;
+            text-align: center;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            transition: background 0.2s;
+        }
+
+        .stat:last-child { border-right: none; }
+        .stat:hover { background: rgba(255,255,255,0.05); }
+
+        .stat-number {
+            display: block;
+            font-size: 28px;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: -0.5px;
+        }
+
+        .stat-label {
+            display: block;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 1.8px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.45);
+            margin-top: 5px;
+        }
+
+        .num-visited { color: #7ed99a; }
+        .num-wishlist { color: #f5c16c; }
+
+        /* ── BODY ── */
+        .body-wrap { max-width: 1380px; margin: 0 auto; padding: 52px 36px 80px; }
+
+        /* Progress */
+        .progress-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 26px 30px;
+            margin-bottom: 44px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--tan);
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .progress-label { font-size: 13px; font-weight: 600; color: var(--forest); white-space: nowrap; }
+        .progress-track { flex: 1; height: 6px; background: var(--tan); border-radius: 3px; overflow: hidden; }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(to right, var(--forest), var(--sage));
+            border-radius: 3px;
+            transition: width 0.7s cubic-bezier(.22,1,.36,1);
+        }
+
+        .progress-pct { font-size: 13px; font-weight: 700; color: var(--visited); white-space: nowrap; }
+
+        /* Section headings */
+        .section-head {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .section-head-title {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 1.8px;
+            text-transform: uppercase;
+            color: var(--forest);
+        }
+
+        .section-head-rule { flex: 1; height: 1px; background: var(--tan); }
+
+        /* ── MAP ── */
+        .map-wrap { margin-bottom: 52px; }
+
+        #map {
+            height: 450px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--tan);
+        }
+
+        /* Map legend */
+        .map-legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 14px;
+            padding-left: 4px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 12px;
+            color: var(--text-mid);
+            font-weight: 500;
+        }
+
+        .legend-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+        }
+
+        .dot-default { background: var(--forest-light); }
+        .dot-visited { background: var(--visited); }
+        .dot-wishlist { background: var(--wishlist); }
+
+        /* ── CONTROLS ── */
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .search-wrap { position: relative; flex: 1; min-width: 200px; }
+
+        .search-wrap svg {
+            position: absolute;
+            left: 13px; top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-light);
+            pointer-events: none;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 11px 14px 11px 38px;
+            border: 1.5px solid var(--tan);
+            border-radius: var(--radius);
+            font-size: 13.5px;
+            font-family: 'Inter', sans-serif;
+            background: white;
+            color: var(--text-dark);
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .search-input::placeholder { color: var(--text-light); }
+
+        .search-input:focus {
+            border-color: var(--sage);
+            box-shadow: 0 0 0 3px rgba(107,158,116,0.15);
+        }
+
+        .filter-pill {
+            padding: 10px 18px;
+            border-radius: 50px;
+            border: 1.5px solid var(--tan);
+            background: white;
+            font-size: 12.5px;
+            font-weight: 500;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-mid);
+            cursor: pointer;
+            transition: all 0.18s;
+            white-space: nowrap;
+        }
+
+        .filter-pill:hover { border-color: var(--sage); color: var(--forest); }
+
+        .filter-pill.active {
+            background: var(--forest);
+            border-color: var(--forest);
+            color: white;
+        }
+
+        .region-select {
+            padding: 10px 14px;
+            border: 1.5px solid var(--tan);
+            border-radius: var(--radius);
+            font-size: 12.5px;
+            font-family: 'Inter', sans-serif;
+            background: white;
+            color: var(--text-mid);
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .region-select:focus { border-color: var(--sage); }
+
+        .results-label {
+            font-size: 12.5px;
+            color: var(--text-light);
+            padding: 4px 0 16px;
+            font-weight: 500;
+        }
+
+        .results-label strong { color: var(--text-mid); font-weight: 700; }
+
+        /* ── GRID ── */
+        .parks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(292px, 1fr));
+            gap: 18px;
+        }
+
+        /* ── CARD ── */
+        .park-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            border: 1px solid rgba(0,0,0,0.06);
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.22s cubic-bezier(.34,1.36,.64,1), box-shadow 0.22s;
+            animation: riseIn 0.35s ease both;
+        }
+
+        .park-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .card-banner {
+            height: 96px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            padding: 14px 16px;
+            position: relative;
+        }
+
+        .card-icon { font-size: 26px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); }
+
+        .status-chip {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            border-radius: 20px;
+            position: absolute;
+            top: 12px;
+            right: 12px;
+        }
+
+        .chip-visited { background: rgba(31,122,61,0.88); color: white; }
+        .chip-wishlist { background: rgba(184,115,9,0.88); color: white; }
+
+        .card-body { padding: 18px 20px 20px; }
+
+        .card-state-label {
+            font-size: 10.5px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--sage);
+            margin-bottom: 4px;
+        }
+
+        .card-name {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--forest);
+            line-height: 1.2;
+            margin-bottom: 8px;
+        }
+
+        .card-desc {
+            font-size: 12.5px;
+            color: var(--text-mid);
+            line-height: 1.65;
+            margin-bottom: 14px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .card-pills {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+        }
+
+        .card-pill {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-light);
+            background: var(--cream);
+            border: 1px solid var(--tan);
+            padding: 3px 9px;
+            border-radius: 20px;
+        }
+
+        .card-actions { display: flex; gap: 7px; }
+
+        .act-btn {
+            flex: 1;
+            padding: 9px 10px;
+            border-radius: 7px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: all 0.18s;
+            border: 1.5px solid transparent;
+            letter-spacing: 0.2px;
+        }
+
+        .act-visited {
+            background: rgba(31,122,61,0.07);
+            border-color: rgba(31,122,61,0.18);
+            color: var(--visited);
+        }
+
+        .act-visited:hover { background: rgba(31,122,61,0.13); }
+        .act-visited.on { background: var(--visited); border-color: var(--visited); color: white; }
+
+        .act-wishlist {
+            background: rgba(184,115,9,0.07);
+            border-color: rgba(184,115,9,0.18);
+            color: var(--wishlist);
+        }
+
+        .act-wishlist:hover { background: rgba(184,115,9,0.13); }
+        .act-wishlist.on { background: var(--wishlist); border-color: var(--wishlist); color: white; }
+
+        /* ── MODAL ── */
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(10,20,14,0.55);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            z-index: 900;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s;
+        }
+
+        .overlay.open { opacity: 1; pointer-events: all; }
+
+        .modal {
+            background: white;
+            border-radius: 22px;
+            max-width: 540px;
+            width: 100%;
+            max-height: 88vh;
+            overflow-y: auto;
+            box-shadow: 0 28px 80px rgba(0,0,0,0.28);
+            transform: translateY(24px) scale(0.96);
+            transition: transform 0.28s cubic-bezier(.34,1.36,.64,1);
+        }
+
+        .overlay.open .modal { transform: none; }
+
+        .modal-banner {
+            height: 155px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 52px;
+            position: relative;
+            border-radius: 22px 22px 0 0;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 14px; right: 14px;
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,0.92);
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s;
+            color: #333;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .modal-close:hover { background: white; }
+
+        .modal-body { padding: 28px 30px 32px; }
+
+        .modal-region {
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--sage);
+            margin-bottom: 6px;
+        }
+
+        .modal-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 30px;
+            color: var(--forest);
+            line-height: 1.15;
+            margin-bottom: 14px;
+        }
+
+        .modal-desc {
+            font-size: 14px;
+            color: var(--text-mid);
+            line-height: 1.8;
+            margin-bottom: 24px;
+        }
+
+        .modal-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .modal-detail {
+            background: var(--cream);
+            border: 1px solid var(--tan);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+        }
+
+        .detail-key {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--text-light);
+            margin-bottom: 5px;
+        }
+
+        .detail-val {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--forest);
+        }
+
+        .modal-acts { display: flex; gap: 10px; }
+
+        .modal-acts .act-btn {
+            padding: 14px;
+            font-size: 13px;
+        }
+
+        /* ── EMPTY ── */
+        .empty {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 90px 20px;
+        }
+
+        .empty-emoji { font-size: 44px; margin-bottom: 16px; }
+        .empty h3 { font-size: 17px; color: var(--text-mid); font-weight: 600; margin-bottom: 6px; }
+        .empty p { font-size: 13px; color: var(--text-light); }
+
+        /* ── REGION BANNERS ── */
+        .r-Northeast  { background: linear-gradient(140deg,#1a2d52,#2e4f8a); }
+        .r-Southeast  { background: linear-gradient(140deg,#1a3d20,#2d7a3e); }
+        .r-Midwest    { background: linear-gradient(140deg,#4a3a10,#8a6a1a); }
+        .r-Rockies    { background: linear-gradient(140deg,#2a1a5c,#4e2f96); }
+        .r-Southwest  { background: linear-gradient(140deg,#6e2a0a,#c05020); }
+        .r-Northwest  { background: linear-gradient(140deg,#0a3042,#1266a0); }
+        .r-Alaska     { background: linear-gradient(140deg,#0a2a40,#0d5a6e); }
+        .r-Hawaii     { background: linear-gradient(140deg,#3a0a52,#7a1a96); }
+        .r-Territories{ background: linear-gradient(140deg,#0a3a30,#0d7a64); }
+
+        /* ── ANIMATIONS ── */
+        @keyframes riseIn {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── LEAFLET OVERRIDES ── */
+        .leaflet-popup-content-wrapper {
+            border-radius: 12px !important;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.16) !important;
+            font-family: 'Inter', sans-serif !important;
+            padding: 0 !important;
+        }
+
+        .leaflet-popup-content { margin: 14px 16px !important; }
+        .leaflet-popup-tip-container { display: none; }
+
+        .popup-inner-name { font-weight: 700; font-size: 13.5px; color: var(--forest); }
+        .popup-inner-state { font-size: 11.5px; color: var(--text-light); margin-top: 2px; }
+        .popup-inner-region { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--sage); margin-top: 5px; }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 700px) {
+            .header { padding: 44px 22px 40px; }
+            .body-wrap { padding: 36px 18px 60px; }
+            .stats-row { flex-wrap: wrap; border-radius: 12px; }
+            .stat { padding: 14px 20px; }
+            #map { height: 300px; }
+            .parks-grid { grid-template-columns: 1fr; }
+            .modal-grid { grid-template-columns: 1fr; }
+            .modal-body { padding: 22px 22px 28px; }
+            .progress-card { flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header class="header">
+    <div class="header-mountains"></div>
+    <div class="header-content">
+        <div class="header-eyebrow">All 63 US National Parks</div>
+        <h1>National Parks<br>Explorer</h1>
+        <p class="header-sub">Track every park you've conquered and curate your bucket list — one landscape at a time.</p>
+        <div class="stats-row">
+            <div class="stat">
+                <span class="stat-number" id="sTotal">63</span>
+                <span class="stat-label">Parks</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number num-visited" id="sVisited">0</span>
+                <span class="stat-label">Visited</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number num-wishlist" id="sWishlist">0</span>
+                <span class="stat-label">Wishlist</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number" id="sLeft">63</span>
+                <span class="stat-label">Remaining</span>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- ── BODY ── -->
+<div class="body-wrap">
+
+    <!-- Progress bar -->
+    <div class="progress-card">
+        <span class="progress-label">Journey Progress</span>
+        <div class="progress-track">
+            <div class="progress-fill" id="progFill" style="width:0%"></div>
+        </div>
+        <span class="progress-pct" id="progPct">0 of 63</span>
+    </div>
+
+    <!-- Map -->
+    <div class="map-wrap">
+        <div class="section-head">
+            <span class="section-head-title">Park Map</span>
+            <div class="section-head-rule"></div>
+        </div>
+        <div id="map"></div>
+        <div class="map-legend">
+            <div class="legend-item"><div class="legend-dot dot-default"></div> Not visited</div>
+            <div class="legend-item"><div class="legend-dot dot-visited"></div> Visited</div>
+            <div class="legend-item"><div class="legend-dot dot-wishlist"></div> Wishlist</div>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="section-head">
+        <span class="section-head-title">All Parks</span>
+        <div class="section-head-rule"></div>
+    </div>
+
+    <div class="controls">
+        <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="search-input" id="searchInput" type="text" placeholder="Search parks, states…">
+        </div>
+        <button class="filter-pill active" data-f="all">All</button>
+        <button class="filter-pill" data-f="visited">Visited</button>
+        <button class="filter-pill" data-f="wishlist">Wishlist</button>
+        <button class="filter-pill" data-f="none">Unvisited</button>
+        <select class="region-select" id="regionSel">
+            <option value="all">All Regions</option>
+            <option>Northeast</option>
+            <option>Southeast</option>
+            <option>Midwest</option>
+            <option>Rockies</option>
+            <option>Southwest</option>
+            <option>Northwest</option>
+            <option>Alaska</option>
+            <option>Hawaii</option>
+            <option>Territories</option>
+        </select>
+    </div>
+
+    <div class="results-label" id="resultsLabel"><strong>63</strong> parks</div>
+
+    <div class="parks-grid" id="grid"></div>
+</div>
+
+<!-- ── MODAL ── -->
+<div class="overlay" id="overlay">
+    <div class="modal" id="modal">
+        <div class="modal-banner" id="mBanner">
+            <span id="mIcon"></span>
+            <button class="modal-close" id="mClose">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-region" id="mRegion"></div>
+            <div class="modal-name" id="mName"></div>
+            <div class="modal-desc" id="mDesc"></div>
+            <div class="modal-grid" id="mDetails"></div>
+            <div class="modal-acts">
+                <button class="act-btn act-visited" id="mBtnV">✓ Mark Visited</button>
+                <button class="act-btn act-wishlist" id="mBtnW">♡ Add to Wishlist</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ── DATA ── */
+const PARKS = [
+  {id:'acadia',name:'Acadia',state:'Maine',region:'Northeast',lat:44.35,lng:-68.21,icon:'🌊',desc:'Rocky coastline, offshore islands, and a stunning mix of sea and mountains. Cadillac Mountain offers the first sunrise view in the US most of the year.',est:1919,area:'49,075 acres',visitors:'3.9M/yr',best:'Sep – Oct'},
+  {id:'american-samoa',name:'American Samoa',state:'American Samoa',region:'Territories',lat:-14.25,lng:-170.68,icon:'🌺',desc:'Remote tropical paradise in the South Pacific featuring pristine coral reefs, lush rainforest, and a living connection to Polynesian culture.',est:1988,area:'8,257 acres',visitors:'8K/yr',best:'May – Oct'},
+  {id:'arches',name:'Arches',state:'Utah',region:'Southwest',lat:38.68,lng:-109.57,icon:'🏜️',desc:'Over 2,000 natural sandstone arches including the iconic Delicate Arch. The red rock landscape here is otherworldly at sunrise and sunset.',est:1971,area:'76,679 acres',visitors:'1.8M/yr',best:'Mar – May'},
+  {id:'badlands',name:'Badlands',state:'South Dakota',region:'Midwest',lat:43.75,lng:-102.50,icon:'🦬',desc:'Sharply eroded buttes, pinnacles, and spires rising from mixed-grass prairie. One of the world\'s richest fossil beds from ancient mammals.',est:1978,area:'242,756 acres',visitors:'1.2M/yr',best:'May – Sep'},
+  {id:'big-bend',name:'Big Bend',state:'Texas',region:'Southwest',lat:29.25,lng:-103.25,icon:'🌵',desc:'Where the Chihuahuan Desert meets the Rio Grande. Dramatic canyons, incredible biodiversity, and some of the darkest skies in America.',est:1944,area:'801,163 acres',visitors:'581K/yr',best:'Oct – Apr'},
+  {id:'biscayne',name:'Biscayne',state:'Florida',region:'Southeast',lat:25.65,lng:-80.08,icon:'🐠',desc:'Mostly underwater — a rare combination of aquamarine waters, emerald islands, and living coral reefs just south of Miami.',est:1980,area:'172,971 acres',visitors:'469K/yr',best:'Dec – Apr'},
+  {id:'black-canyon',name:'Black Canyon of the Gunnison',state:'Colorado',region:'Rockies',lat:38.57,lng:-107.72,icon:'⛰️',desc:'A nearly vertical chasm dropping over 2,700 feet with some of the steepest cliffs in the US — dramatic and far less crowded than the Grand Canyon.',est:1999,area:'30,750 acres',visitors:'313K/yr',best:'May – Oct'},
+  {id:'bryce-canyon',name:'Bryce Canyon',state:'Utah',region:'Southwest',lat:37.57,lng:-112.18,icon:'🧡',desc:'Thousands of hoodoos — tall spires of red, orange, and white rock — create an alien amphitheater unlike anything else on the planet.',est:1928,area:'35,835 acres',visitors:'2.1M/yr',best:'Jun – Sep'},
+  {id:'canyonlands',name:'Canyonlands',state:'Utah',region:'Southwest',lat:38.20,lng:-109.93,icon:'🏜️',desc:'Where the Colorado and Green rivers carve a vast labyrinth of canyons, mesas, and buttes. The Island in the Sky district offers mind-bending views.',est:1964,area:'337,598 acres',visitors:'773K/yr',best:'Mar – May'},
+  {id:'capitol-reef',name:'Capitol Reef',state:'Utah',region:'Southwest',lat:38.37,lng:-111.17,icon:'🪨',desc:'A 100-mile long wrinkle in the earth\'s crust called the Waterpocket Fold creates a dramatic geological feature in Utah\'s red rock country.',est:1971,area:'241,904 acres',visitors:'1.2M/yr',best:'Apr – Jun'},
+  {id:'carlsbad-caverns',name:'Carlsbad Caverns',state:'New Mexico',region:'Southwest',lat:32.15,lng:-104.56,icon:'🦇',desc:'Over 119 caves carved from limestone, including the enormous Big Room — 4,000 feet long — plus millions of Mexican free-tailed bats.',est:1930,area:'46,766 acres',visitors:'465K/yr',best:'Apr – Oct'},
+  {id:'channel-islands',name:'Channel Islands',state:'California',region:'Northwest',lat:34.01,lng:-119.42,icon:'🦁',desc:'Five islands off the California coast nicknamed the Galapagos of North America for extraordinary marine life and dozens of endemic species.',est:1980,area:'249,561 acres',visitors:'319K/yr',best:'Apr – Oct'},
+  {id:'congaree',name:'Congaree',state:'South Carolina',region:'Southeast',lat:33.78,lng:-80.78,icon:'🌳',desc:'The largest intact expanse of old-growth bottomland hardwood forest in the US, with champion trees and magical synchronous firefly events each spring.',est:2003,area:'26,546 acres',visitors:'222K/yr',best:'Mar – May'},
+  {id:'crater-lake',name:'Crater Lake',state:'Oregon',region:'Northwest',lat:42.94,lng:-122.10,icon:'💙',desc:'The deepest lake in the US at 1,943 feet, formed inside a collapsed volcano caldera. The water is an impossible shade of blue you\'ll never forget.',est:1902,area:'183,224 acres',visitors:'720K/yr',best:'Jul – Sep'},
+  {id:'cuyahoga-valley',name:'Cuyahoga Valley',state:'Ohio',region:'Midwest',lat:41.24,lng:-81.55,icon:'🌿',desc:'A green oasis between Cleveland and Akron — rolling hills, waterfalls, and the winding Cuyahoga River make for a surprising natural escape.',est:2000,area:'32,572 acres',visitors:'2.5M/yr',best:'Apr – Oct'},
+  {id:'death-valley',name:'Death Valley',state:'California',region:'Southwest',lat:36.24,lng:-116.82,icon:'☀️',desc:'The hottest, driest, and lowest national park in the US — yet hauntingly beautiful, with salt flats, sand dunes, and vibrantly colored mountains.',est:1994,area:'3,422,024 acres',visitors:'1.7M/yr',best:'Nov – Mar'},
+  {id:'denali',name:'Denali',state:'Alaska',region:'Alaska',lat:63.33,lng:-150.50,icon:'🏔️',desc:'Home to the tallest peak in North America at 20,310 feet. Grizzlies, wolves, and Dall sheep roam vast, untouched wilderness beyond any road.',est:1917,area:'6,045,153 acres',visitors:'601K/yr',best:'Jun – Aug'},
+  {id:'dry-tortugas',name:'Dry Tortugas',state:'Florida',region:'Southeast',lat:24.63,lng:-82.87,icon:'🐢',desc:'Accessible only by boat or seaplane 70 miles from Key West — a cluster of remote islands home to Fort Jefferson and world-class snorkeling.',est:1992,area:'64,701 acres',visitors:'56K/yr',best:'Dec – Apr'},
+  {id:'everglades',name:'Everglades',state:'Florida',region:'Southeast',lat:25.39,lng:-80.58,icon:'🐊',desc:'The largest subtropical wilderness in the US — a slow-moving river of grass, mangroves, and extraordinary wildlife including alligators and manatees.',est:1947,area:'1,508,938 acres',visitors:'953K/yr',best:'Nov – Apr'},
+  {id:'gates-arctic',name:'Gates of the Arctic',state:'Alaska',region:'Alaska',lat:67.78,lng:-153.30,icon:'🌌',desc:'No roads, no trails, no services. The most remote park in the US sits above the Arctic Circle in six million acres of pure, untouched wilderness.',est:1980,area:'8,472,506 acres',visitors:'10K/yr',best:'Jun – Aug'},
+  {id:'gateway-arch',name:'Gateway Arch',state:'Missouri',region:'Midwest',lat:38.62,lng:-90.19,icon:'🌉',desc:'The iconic 630-foot stainless steel arch on the St. Louis riverfront is the tallest man-made monument in the US, symbolizing westward expansion.',est:2018,area:'91 acres',visitors:'1.8M/yr',best:'Apr – Oct'},
+  {id:'glacier',name:'Glacier',state:'Montana',region:'Rockies',lat:48.70,lng:-113.72,icon:'🧊',desc:'The Crown of the Continent. The Going-to-the-Sun Road is one of the most spectacular drives in the world, bisecting alpine glaciers and turquoise lakes.',est:1910,area:'1,013,322 acres',visitors:'3.1M/yr',best:'Jul – Sep'},
+  {id:'glacier-bay',name:'Glacier Bay',state:'Alaska',region:'Alaska',lat:58.50,lng:-137.00,icon:'🛶',desc:'Watch tidewater glaciers calve massive icebergs into the sea in this dramatic landscape of fjords, snow-capped peaks, and abundant humpback whales.',est:1980,area:'3,283,168 acres',visitors:'595K/yr',best:'May – Sep'},
+  {id:'grand-canyon',name:'Grand Canyon',state:'Arizona',region:'Southwest',lat:36.10,lng:-112.11,icon:'🏜️',desc:'A mile deep, 18 miles wide, and 277 miles long — the Grand Canyon is a geological wonder two billion years in the making, carved by the Colorado River.',est:1919,area:'1,201,647 acres',visitors:'4.7M/yr',best:'Mar – May'},
+  {id:'grand-teton',name:'Grand Teton',state:'Wyoming',region:'Rockies',lat:43.73,lng:-110.80,icon:'⛰️',desc:'Cathedral-like peaks rising abruptly from the Jackson Hole valley floor with no foothills — some of the most dramatic mountain scenery anywhere on Earth.',est:1929,area:'309,994 acres',visitors:'3.4M/yr',best:'Jun – Sep'},
+  {id:'great-basin',name:'Great Basin',state:'Nevada',region:'Southwest',lat:39.00,lng:-114.00,icon:'⭐',desc:'Ancient bristlecone pines over 5,000 years old, marble caves, and skies so dark you can see the Milky Way with your naked eye. An underrated gem.',est:1986,area:'77,180 acres',visitors:'131K/yr',best:'May – Oct'},
+  {id:'great-sand-dunes',name:'Great Sand Dunes',state:'Colorado',region:'Rockies',lat:37.73,lng:-105.51,icon:'🏖️',desc:'The tallest sand dunes in North America rise 750 feet against the snow-capped Sangre de Cristo Mountains in a surreal, high-altitude landscape.',est:2004,area:'107,342 acres',visitors:'592K/yr',best:'May – Oct'},
+  {id:'great-smoky',name:'Great Smoky Mountains',state:'TN / NC',region:'Southeast',lat:35.68,lng:-83.53,icon:'🌫️',desc:'The most visited national park in America. Ancient Appalachian mountains, cascading waterfalls, spring wildflower blooms, and synchronous fireflies.',est:1934,area:'522,427 acres',visitors:'12.5M/yr',best:'Apr – Jun'},
+  {id:'guadalupe',name:'Guadalupe Mountains',state:'Texas',region:'Southwest',lat:31.92,lng:-104.87,icon:'🦅',desc:'The highest peak in Texas and an ancient fossilized marine reef sit in one of the least-visited parks in the continental US — for those in the know.',est:1966,area:'86,367 acres',visitors:'182K/yr',best:'Mar – Apr'},
+  {id:'haleakala',name:'Haleakalā',state:'Hawaii',region:'Hawaii',lat:20.72,lng:-156.15,icon:'🌅',desc:'Witness sunrise from above the clouds atop a 10,000-foot dormant volcano. The crater below looks like the surface of Mars — vast, silent, and alien.',est:1916,area:'33,265 acres',visitors:'994K/yr',best:'Apr – Jun'},
+  {id:'hawaii-volcanoes',name:'Hawaiʻi Volcanoes',state:'Hawaii',region:'Hawaii',lat:19.43,lng:-155.26,icon:'🌋',desc:'Two of the world\'s most active volcanoes — Kīlauea and Mauna Loa — where you can witness the raw power of the earth creating new land in real time.',est:1916,area:'323,431 acres',visitors:'1.2M/yr',best:'Year-round'},
+  {id:'hot-springs',name:'Hot Springs',state:'Arkansas',region:'Southeast',lat:34.51,lng:-93.05,icon:'♨️',desc:'Thermal springs flowing from the Ouachita Mountains at 143°F. The oldest federally protected land in the US, historically known for healing waters.',est:1921,area:'5,554 acres',visitors:'1.5M/yr',best:'Mar – Nov'},
+  {id:'indiana-dunes',name:'Indiana Dunes',state:'Indiana',region:'Midwest',lat:41.65,lng:-87.05,icon:'🌾',desc:'Miles of beaches and towering dunes along the southern shore of Lake Michigan — remarkable ecological diversity just an hour from downtown Chicago.',est:2019,area:'15,349 acres',visitors:'3.4M/yr',best:'Jun – Aug'},
+  {id:'isle-royale',name:'Isle Royale',state:'Michigan',region:'Midwest',lat:48.10,lng:-88.55,icon:'🐺',desc:'An island wilderness in Lake Superior hosting the longest continuous predator-prey study in science — wolves and moose in total isolation.',est:1940,area:'571,790 acres',visitors:'26K/yr',best:'Jun – Sep'},
+  {id:'joshua-tree',name:'Joshua Tree',state:'California',region:'Southwest',lat:33.88,lng:-115.90,icon:'🌵',desc:'Where the Mojave and Sonoran deserts collide under skies blanketed with stars. Bizarre Joshua trees, enormous boulder formations, and epic silence.',est:1994,area:'795,155 acres',visitors:'3.4M/yr',best:'Oct – May'},
+  {id:'katmai',name:'Katmai',state:'Alaska',region:'Alaska',lat:58.50,lng:-155.00,icon:'🐻',desc:'At Brooks Falls, brown bears congregate to catch leaping sockeye salmon mid-air — one of the most spectacular wildlife events on the planet.',est:1980,area:'4,093,077 acres',visitors:'73K/yr',best:'Jul – Sep'},
+  {id:'kenai-fjords',name:'Kenai Fjords',state:'Alaska',region:'Alaska',lat:59.92,lng:-150.18,icon:'🚢',desc:'Exit Glacier, tidewater glaciers calving into dark fjords, sea otters, orcas, and humpback whales. Wild Alaska at its most accessible.',est:1980,area:'669,983 acres',visitors:'404K/yr',best:'May – Sep'},
+  {id:'kings-canyon',name:'Kings Canyon',state:'California',region:'Northwest',lat:36.89,lng:-118.55,icon:'🌲',desc:'One of the deepest canyons in North America flanked by giant sequoia groves and jagged Sierra Nevada peaks — genuinely wild and uncrowded.',est:1940,area:'461,901 acres',visitors:'699K/yr',best:'May – Oct'},
+  {id:'kobuk-valley',name:'Kobuk Valley',state:'Alaska',region:'Alaska',lat:67.33,lng:-159.12,icon:'🦌',desc:'Twenty-five square miles of sand dunes above the Arctic Circle, carved by an ancient glacial lake. One of the least visited parks in the entire system.',est:1980,area:'1,750,717 acres',visitors:'15K/yr',best:'Jun – Aug'},
+  {id:'lake-clark',name:'Lake Clark',state:'Alaska',region:'Alaska',lat:60.97,lng:-153.42,icon:'🌊',desc:'Volcanoes, glaciers, wild coastline, and pristine lakes in a park larger than Maryland — accessible only by small aircraft with zero roads in.',est:1980,area:'2,619,816 acres',visitors:'19K/yr',best:'Jun – Sep'},
+  {id:'lassen-volcanic',name:'Lassen Volcanic',state:'California',region:'Northwest',lat:40.49,lng:-121.51,icon:'🌋',desc:'Boiling springs, fumaroles, and bubbling mudpots surround Lassen Peak, which last erupted in 1915 — a fascinating window into volcanic forces.',est:1916,area:'106,452 acres',visitors:'499K/yr',best:'Jun – Oct'},
+  {id:'mammoth-cave',name:'Mammoth Cave',state:'Kentucky',region:'Southeast',lat:37.19,lng:-86.10,icon:'🕳️',desc:'The world\'s longest known cave system — over 400 mapped miles of passages with extraordinary gypsum formations deep beneath Kentucky\'s hills.',est:1941,area:'54,012 acres',visitors:'587K/yr',best:'Year-round'},
+  {id:'mesa-verde',name:'Mesa Verde',state:'Colorado',region:'Rockies',lat:37.18,lng:-108.49,icon:'🏛️',desc:'Cliff Palace and 600 other cliff dwellings preserve the extraordinary work of Ancestral Puebloans who lived here over 700 years ago.',est:1906,area:'52,485 acres',visitors:'563K/yr',best:'May – Oct'},
+  {id:'mount-rainier',name:'Mount Rainier',state:'Washington',region:'Northwest',lat:46.85,lng:-121.75,icon:'🌨️',desc:'An active stratovolcano capped by the largest glacial system in the lower 48 states, circled by the most breathtaking wildflower meadows in America.',est:1899,area:'236,381 acres',visitors:'1.6M/yr',best:'Jul – Sep'},
+  {id:'new-river-gorge',name:'New River Gorge',state:'West Virginia',region:'Southeast',lat:38.07,lng:-81.08,icon:'🌉',desc:'America\'s newest national park features the longest steel arch bridge in the Western Hemisphere over one of the oldest rivers in the world.',est:2020,area:'70,611 acres',visitors:'1.6M/yr',best:'May – Oct'},
+  {id:'north-cascades',name:'North Cascades',state:'Washington',region:'Northwest',lat:48.70,lng:-121.20,icon:'❄️',desc:'More glaciers than anywhere else in the lower 48. Rugged, remote, and jaw-dropping — nicknamed the American Alps for good reason.',est:1968,area:'504,643 acres',visitors:'30K/yr',best:'Jul – Sep'},
+  {id:'olympic',name:'Olympic',state:'Washington',region:'Northwest',lat:47.97,lng:-123.50,icon:'🌧️',desc:'Three ecosystems in one park: glacier-capped peaks, one of only a few temperate rainforests in the US, and 73 miles of wild Pacific coastline.',est:1938,area:'922,651 acres',visitors:'3.4M/yr',best:'Jun – Sep'},
+  {id:'petrified-forest',name:'Petrified Forest',state:'Arizona',region:'Southwest',lat:35.07,lng:-109.78,icon:'🪵',desc:'Ancient logs turned to crystal over 225 million years lie scattered across the Painted Desert in a stunning geological time capsule.',est:1962,area:'221,390 acres',visitors:'644K/yr',best:'Mar – May'},
+  {id:'pinnacles',name:'Pinnacles',state:'California',region:'Northwest',lat:36.49,lng:-121.20,icon:'🦅',desc:'Dramatic volcanic spires and talus caves in the California hills — a critical habitat for the critically endangered California condor.',est:2013,area:'26,686 acres',visitors:'182K/yr',best:'Feb – May'},
+  {id:'redwood',name:'Redwood',state:'California',region:'Northwest',lat:41.30,lng:-124.00,icon:'🌲',desc:'Home to the tallest trees on Earth — coast redwoods reaching 380 feet — alongside ancient forests and a fog-laced Pacific coastline.',est:1968,area:'138,999 acres',visitors:'491K/yr',best:'May – Sep'},
+  {id:'rocky-mountain',name:'Rocky Mountain',state:'Colorado',region:'Rockies',lat:40.40,lng:-105.58,icon:'🏔️',desc:'Trail Ridge Road climbs above 12,000 feet across the Continental Divide through spectacular tundra, wildflower meadows, and elk-filled valleys.',est:1915,area:'265,807 acres',visitors:'4.4M/yr',best:'Jun – Sep'},
+  {id:'saguaro',name:'Saguaro',state:'Arizona',region:'Southwest',lat:32.25,lng:-110.50,icon:'🌵',desc:'Giant saguaro cacti — some over 150 years old and 50 feet tall — dominate the Sonoran Desert in two districts flanking Tucson, Arizona.',est:1994,area:'91,715 acres',visitors:'957K/yr',best:'Nov – Apr'},
+  {id:'sequoia',name:'Sequoia',state:'California',region:'Northwest',lat:36.43,lng:-118.68,icon:'🌲',desc:'The largest trees on Earth by volume live here. General Sherman Tree is the single largest living organism on the planet by sheer mass.',est:1890,area:'404,063 acres',visitors:'1.2M/yr',best:'May – Oct'},
+  {id:'shenandoah',name:'Shenandoah',state:'Virginia',region:'Northeast',lat:38.53,lng:-78.35,icon:'🍂',desc:'Skyline Drive winds 105 miles along the crest of the Blue Ridge Mountains through brilliant fall foliage and classic Appalachian landscapes.',est:1935,area:'199,045 acres',visitors:'1.8M/yr',best:'October'},
+  {id:'theodore-roosevelt',name:'Theodore Roosevelt',state:'North Dakota',region:'Midwest',lat:46.97,lng:-103.45,icon:'🦌',desc:'Painted badlands, wild bison herds, and free-roaming horses — the landscape that inspired the young Theodore Roosevelt\'s conservation vision.',est:1978,area:'70,446 acres',visitors:'749K/yr',best:'May – Sep'},
+  {id:'virgin-islands',name:'Virgin Islands',state:'U.S. Virgin Islands',region:'Territories',lat:18.33,lng:-64.73,icon:'🏝️',desc:'Pristine white beaches, turquoise water, and lush hillsides on St. John — two-thirds of the island is permanently protected national parkland.',est:1956,area:'14,688 acres',visitors:'367K/yr',best:'Dec – Apr'},
+  {id:'voyageurs',name:'Voyageurs',state:'Minnesota',region:'Midwest',lat:48.48,lng:-92.83,icon:'⛵',desc:'A water-based wilderness of interconnected lakes on the Canadian border — accessible only by watercraft, with stunning northern lights in winter.',est:1975,area:'218,200 acres',visitors:'232K/yr',best:'Jun – Sep'},
+  {id:'white-sands',name:'White Sands',state:'New Mexico',region:'Southwest',lat:32.78,lng:-106.17,icon:'🏔️',desc:'The world\'s largest gypsum dune field — an endless expanse of blinding white sand shifting across New Mexico\'s Tularosa Basin.',est:2019,area:'146,344 acres',visitors:'782K/yr',best:'Oct – Apr'},
+  {id:'wind-cave',name:'Wind Cave',state:'South Dakota',region:'Midwest',lat:43.57,lng:-103.48,icon:'💨',desc:'One of the world\'s longest caves with rare boxwork calcite formations inside. Above, bison, elk, and pronghorn roam open mixed-grass prairie.',est:1903,area:'33,847 acres',visitors:'656K/yr',best:'May – Sep'},
+  {id:'wrangell',name:'Wrangell-St. Elias',state:'Alaska',region:'Alaska',lat:61.00,lng:-142.00,icon:'🏔️',desc:'Larger than Switzerland, this is America\'s biggest national park — with the greatest concentration of peaks over 14,000 feet on the continent.',est:1980,area:'13,175,799 acres',visitors:'79K/yr',best:'Jun – Sep'},
+  {id:'yellowstone',name:'Yellowstone',state:'WY / MT / ID',region:'Rockies',lat:44.60,lng:-110.50,icon:'🌊',desc:'The world\'s first national park sits atop a supervolcano — Old Faithful, 10,000 geothermal features, wolf packs, and herds of bison.',est:1872,area:'2,219,791 acres',visitors:'4.9M/yr',best:'Jun – Sep'},
+  {id:'yosemite',name:'Yosemite',state:'California',region:'Northwest',lat:37.87,lng:-119.54,icon:'🌅',desc:'El Capitan, Half Dome, and waterfalls plunging thousands of feet into a glacier-carved valley. One of the defining landscapes of planet Earth.',est:1890,area:'747,956 acres',visitors:'3.3M/yr',best:'May – Sep'},
+  {id:'zion',name:'Zion',state:'Utah',region:'Southwest',lat:37.30,lng:-113.05,icon:'🧡',desc:'Angels Landing and The Narrows are iconic — massive sandstone cliffs drop into narrow slot canyons where the Virgin River threads below.',est:1919,area:'147,551 acres',visitors:'5.0M/yr',best:'Mar – May'},
+];
+
+const REGION_CLASS = {
+  Northeast:'r-Northeast', Southeast:'r-Southeast', Midwest:'r-Midwest',
+  Rockies:'r-Rockies', Southwest:'r-Southwest', Northwest:'r-Northwest',
+  Alaska:'r-Alaska', Hawaii:'r-Hawaii', Territories:'r-Territories',
+};
+
+/* ── STATE ── */
+let visited  = new Set(JSON.parse(localStorage.getItem('np_v') || '[]'));
+let wishlist = new Set(JSON.parse(localStorage.getItem('np_w') || '[]'));
+let activeFilter = 'all';
+let activeRegion = 'all';
+let searchQ = '';
+let modalId = null;
+
+function save() {
+  localStorage.setItem('np_v', JSON.stringify([...visited]));
+  localStorage.setItem('np_w', JSON.stringify([...wishlist]));
+}
+
+function status(id) {
+  if (visited.has(id))  return 'visited';
+  if (wishlist.has(id)) return 'wishlist';
+  return 'none';
+}
+
+function doVisited(id) {
+  if (visited.has(id)) { visited.delete(id); }
+  else { visited.add(id); wishlist.delete(id); }
+  save(); refresh();
+}
+
+function doWishlist(id) {
+  if (wishlist.has(id)) { wishlist.delete(id); }
+  else { wishlist.add(id); visited.delete(id); }
+  save(); refresh();
+}
+
+/* ── MAP ── */
+let map, mMarkers = {};
+
+function initMap() {
+  map = L.map('map', { scrollWheelZoom: false, zoomControl: true }).setView([39.5, -98.35], 3);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CARTO',
+    subdomains: 'abcd', maxZoom: 19,
+  }).addTo(map);
+  PARKS.forEach(p => { mMarkers[p.id] = makeMarker(p).addTo(map); });
+}
+
+function markerColor(id) {
+  const s = status(id);
+  return s === 'visited' ? '#1f7a3d' : s === 'wishlist' ? '#b87309' : '#2d5a3d';
+}
+
+function makeMarker(park) {
+  const col = markerColor(park.id);
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="width:13px;height:13px;border-radius:50%;background:${col};border:2.5px solid white;box-shadow:0 1px 5px rgba(0,0,0,.35);"></div>`,
+    iconSize: [13,13], iconAnchor: [6.5,6.5],
+  });
+  const m = L.marker([park.lat, park.lng], {icon});
+  m.bindPopup(`<div class="popup-inner-name">${park.icon} ${park.name}</div><div class="popup-inner-state">${park.state}</div><div class="popup-inner-region">${park.region}</div>`, {maxWidth:180});
+  m.on('click', () => openModal(park.id));
+  return m;
+}
+
+function refreshMarkers() {
+  PARKS.forEach(p => {
+    if (mMarkers[p.id]) { mMarkers[p.id].remove(); }
+    mMarkers[p.id] = makeMarker(p).addTo(map);
+  });
+}
+
+/* ── STATS ── */
+function refreshStats() {
+  const v = visited.size, w = wishlist.size, total = PARKS.length;
+  document.getElementById('sVisited').textContent  = v;
+  document.getElementById('sWishlist').textContent = w;
+  document.getElementById('sLeft').textContent     = total - v;
+  const pct = Math.round((v / total) * 100);
+  document.getElementById('progFill').style.width  = pct + '%';
+  document.getElementById('progPct').textContent   = v + ' of ' + total;
+}
+
+/* ── CARDS ── */
+function visible() {
+  return PARKS.filter(p => {
+    const s = status(p.id);
+    if (activeFilter !== 'all' && s !== activeFilter) return false;
+    if (activeRegion !== 'all' && p.region !== activeRegion) return false;
+    if (searchQ) {
+      const q = searchQ.toLowerCase();
+      if (!p.name.toLowerCase().includes(q) && !p.state.toLowerCase().includes(q) && !p.region.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function renderCards() {
+  const grid = document.getElementById('grid');
+  const parks = visible();
+  document.getElementById('resultsLabel').innerHTML = `<strong>${parks.length}</strong> park${parks.length !== 1 ? 's' : ''}`;
+
+  if (!parks.length) {
+    grid.innerHTML = `<div class="empty"><div class="empty-emoji">🏔️</div><h3>No parks found</h3><p>Try adjusting your filters or search.</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = parks.map((p, i) => {
+    const s = status(p.id);
+    const rc = REGION_CLASS[p.region] || 'r-Northwest';
+    const chip = s === 'visited'
+      ? `<span class="status-chip chip-visited">✓ Visited</span>`
+      : s === 'wishlist'
+      ? `<span class="status-chip chip-wishlist">♡ Wishlist</span>`
+      : '';
+    return `
+      <div class="park-card" style="animation-delay:${Math.min(i * 0.028, 0.45)}s" onclick="openModal('${p.id}')">
+        <div class="card-banner ${rc}">
+          <span class="card-icon">${p.icon}</span>
+          ${chip}
+        </div>
+        <div class="card-body">
+          <div class="card-state-label">${p.state}</div>
+          <div class="card-name">${p.name}</div>
+          <div class="card-desc">${p.desc}</div>
+          <div class="card-pills">
+            <span class="card-pill">Est. ${p.est}</span>
+            <span class="card-pill">Best: ${p.best}</span>
+          </div>
+          <div class="card-actions" onclick="event.stopPropagation()">
+            <button class="act-btn act-visited ${s === 'visited' ? 'on' : ''}" onclick="doVisited('${p.id}')">✓ Visited</button>
+            <button class="act-btn act-wishlist ${s === 'wishlist' ? 'on' : ''}" onclick="doWishlist('${p.id}')">♡ Wishlist</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ── MODAL ── */
+function openModal(id) {
+  const p = PARKS.find(x => x.id === id);
+  if (!p) return;
+  modalId = id;
+  const rc = REGION_CLASS[p.region] || 'r-Northwest';
+  document.getElementById('mBanner').className = `modal-banner ${rc}`;
+  document.getElementById('mIcon').textContent  = p.icon;
+  document.getElementById('mRegion').textContent = `${p.state}  ·  ${p.region}`;
+  document.getElementById('mName').textContent   = p.name;
+  document.getElementById('mDesc').textContent   = p.desc;
+  document.getElementById('mDetails').innerHTML  = `
+    <div class="modal-detail"><div class="detail-key">Established</div><div class="detail-val">${p.est}</div></div>
+    <div class="modal-detail"><div class="detail-key">Area</div><div class="detail-val">${p.area}</div></div>
+    <div class="modal-detail"><div class="detail-key">Annual Visitors</div><div class="detail-val">${p.visitors}</div></div>
+    <div class="modal-detail"><div class="detail-key">Best Season</div><div class="detail-val">${p.best}</div></div>
+  `;
+  refreshModalBtns();
+  document.getElementById('overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  map.flyTo([p.lat, p.lng], 7, {duration: 1.1});
+}
+
+function refreshModalBtns() {
+  const s = status(modalId);
+  const bv = document.getElementById('mBtnV');
+  const bw = document.getElementById('mBtnW');
+  bv.className = `act-btn act-visited ${s === 'visited' ? 'on' : ''}`;
+  bv.textContent = s === 'visited' ? '✓ Visited!' : '✓ Mark Visited';
+  bw.className = `act-btn act-wishlist ${s === 'wishlist' ? 'on' : ''}`;
+  bw.textContent = s === 'wishlist' ? '♡ On Wishlist' : '♡ Add to Wishlist';
+}
+
+function closeModal() {
+  document.getElementById('overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  modalId = null;
+  map.flyTo([39.5, -98.35], 3, {duration: 1});
+}
+
+function refresh() {
+  refreshStats();
+  refreshMarkers();
+  renderCards();
+  if (modalId) refreshModalBtns();
+}
+
+/* ── WIRE UP ── */
+document.getElementById('mBtnV').onclick = () => { doVisited(modalId); };
+document.getElementById('mBtnW').onclick = () => { doWishlist(modalId); };
+document.getElementById('mClose').onclick = closeModal;
+document.getElementById('overlay').onclick = e => { if (e.target === document.getElementById('overlay')) closeModal(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+document.getElementById('searchInput').addEventListener('input', e => {
+  searchQ = e.target.value.trim();
+  renderCards();
+});
+
+document.querySelectorAll('.filter-pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.f;
+    renderCards();
+  });
+});
+
+document.getElementById('regionSel').addEventListener('change', e => {
+  activeRegion = e.target.value;
+  renderCards();
+});
+
+/* ── BOOT ── */
+initMap();
+refresh();
+</script>
+</body>
+</html>
